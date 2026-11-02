@@ -3,6 +3,8 @@
 from copy import deepcopy
 from typing import Any
 
+import pytest
+
 from langchain_core.messages import AIMessage, AIMessageChunk
 from langchain_core.messages.block_translators.google_genai import (
     translate_grounding_metadata_to_citations,
@@ -251,6 +253,45 @@ def test_content_blocks_preserve_index_for_images() -> None:
 
     assert [block["type"] for block in blocks] == ["image", "image"]
     assert [block.get("index") for block in blocks] == [0, 1]
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        pytest.param("data:image/png;base64,QUFBQQ==", id="data-uri"),
+        pytest.param("QUFBQQ==", id="raw-base64"),
+    ],
+)
+def test_content_blocks_preserve_extras_for_images(url: str) -> None:
+    """Gemini rejects replayed images that lost their thought signature."""
+    extras = {"signature": "c2ln"}
+    message = AIMessage(
+        content=[{"type": "image_url", "image_url": {"url": url}, "extras": extras}],
+        response_metadata={"model_provider": "google_genai"},
+    )
+
+    [block] = message.content_blocks
+
+    assert block["type"] == "image"
+    assert block.get("extras") == extras
+    assert block.get("extras") is not extras
+
+
+def test_content_blocks_omit_extras_for_images_when_source_has_none() -> None:
+    message = AIMessage(
+        content=[
+            {
+                "type": "image_url",
+                "image_url": {"url": "data:image/png;base64,QUFBQQ=="},
+            }
+        ],
+        response_metadata={"model_provider": "google_genai"},
+    )
+
+    [block] = message.content_blocks
+
+    assert block["type"] == "image"
+    assert "extras" not in block
 
 
 def test_content_blocks_preserve_index_for_parallel_tool_calls() -> None:

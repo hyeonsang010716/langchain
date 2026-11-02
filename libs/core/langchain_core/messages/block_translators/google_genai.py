@@ -449,6 +449,14 @@ def _convert_to_v1_from_genai(message: AIMessage) -> list[types.ContentBlock]:
                     converted_blocks.append({"type": "non_standard", "value": item})
                     msg = "Image URL not a data URI; appending as non-standard block."
                     raise ValueError(msg)
+                # Gemini requires an image's thought signature on later turns.
+                image_extras = item.get("extras")
+                if (
+                    converted_blocks[-1]["type"] == "image"
+                    and isinstance(image_extras, dict)
+                    and image_extras
+                ):
+                    converted_blocks[-1]["extras"] = dict(image_extras)
             elif item_type == "function_call":
                 # Handle Google GenAI function calls
                 function_call_block: types.ToolCall = {
